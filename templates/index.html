@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="welcome-row"><div><h2>Welcome back</h2><p>Connect a mailbox, choose a folder, and inspect message headers securely.</p></div><div class="secure-chip">◈ &nbsp; IMAP over SSL</div></section>
+<section class="stats-grid">
+  <div class="stat-card"><div class="stat-icon blue">↔</div><div><span>Provider</span><strong>{{ providers[provider].label if connected else '—' }}</strong></div></div>
+  <div class="stat-card"><div class="stat-icon violet">▤</div><div><span>Mailboxes found</span><strong>{{ folders|length if connected else '—' }}</strong></div></div>
+  <div class="stat-card"><div class="stat-icon cyan">⌕</div><div><span>Headers extracted</span><strong>{{ rows|length }}</strong></div></div>
+  <div class="stat-card"><div class="stat-icon green">✓</div><div><span>Connection</span><strong>{{ 'Active' if connected else 'Offline' }}</strong></div></div>
+</section>
+<section class="panel" id="connection"><div class="panel-heading"><div><div class="eyebrow">STEP 01</div><h3>Email connection</h3><p>Use an app password where supported. It is not saved to disk.</p></div><span class="panel-mark">01</span></div>
+<form method="post" action="{{ url_for('connect') }}" class="connect-form">
+  <label>EMAIL PROVIDER<select name="provider" id="provider" required>{% for key, p in providers.items() %}<option value="{{ key }}" {% if (connected and provider==key) or (not connected and key=='gmail') %}selected{% endif %}>{{ p.label }}</option>{% endfor %}</select></label>
+  <label>EMAIL ADDRESS<input type="email" name="email" placeholder="you@example.com" value="{{ account_email if connected else '' }}" required autocomplete="username"></label>
+  <label>APP PASSWORD<input type="password" name="password" placeholder="Enter app password" required autocomplete="current-password"></label>
+  <div class="provider-note" id="provider-note">{{ providers[provider].auth_note }}</div>
+  <button class="btn primary" type="submit">Connect mailbox <span>→</span></button>
+</form>
+{% if connected %}<form method="post" action="{{ url_for('disconnect') }}" class="disconnect-form"><button class="btn secondary" type="submit">Disconnect and clear credentials</button></form>{% endif %}
+</section>
+<section class="panel" id="extract-panel"><div class="panel-heading"><div><div class="eyebrow">STEP 02</div><h3>Choose mailbox & extract</h3><p>Inspect recent headers without downloading message bodies.</p></div><span class="panel-mark">02</span></div>
+{% if connected %}<form method="post" action="{{ url_for('extract') }}" class="extract-form"><label>MAILBOX<select name="folder" required>{% for folder in folders %}<option value="{{ folder.name }}" {% if folder.name==selected_folder %}selected{% endif %}>{{ folder.display_name }}</option>{% endfor %}</select></label><label>NUMBER OF EMAILS<select name="count">{% for n in [25,50,100,200,300] %}<option value="{{ n }}" {% if count==n %}selected{% endif %}>Latest {{ n }}</option>{% endfor %}</select></label><button class="btn primary" type="submit">Extract headers <span>→</span></button></form>{% else %}<div class="empty-connect"><div class="empty-icon">↗</div><strong>Connect your mailbox first</strong><p>Your folders will appear here after a successful connection.</p></div>{% endif %}
+</section>
+<section class="panel results-panel" id="results"><div class="panel-heading results-head"><div><div class="eyebrow">STEP 03</div><h3>Extraction results <span class="count-pill">{{ rows|length }}</span></h3><p>Search and filter the extracted header fields.</p></div>{% if rows %}<a class="btn secondary" href="{{ url_for('export_csv') }}">↓ Export CSV</a>{% endif %}</div>
+{% if rows %}<div class="table-tools"><input id="table-search" type="search" placeholder="Search sender, subject, IP, Message-ID…"><select id="auth-filter"><option value="all">All authentication results</option><option value="pass">At least one PASS</option><option value="fail">Any FAIL</option><option value="na">Any N/A</option></select></div><div class="table-wrap"><table id="results-table"><thead><tr><th>#</th><th>IP</th><th>FROM</th><th>SUBJECT</th><th>MESSAGE-ID</th><th>SPF</th><th>DKIM</th><th>DMARC</th><th>DOWNLOAD</th></tr></thead><tbody>{% for row in rows %}<tr data-auth="{{ (row.spf+' '+row.dkim+' '+row.dmarc)|lower }}"><td>{{ loop.index }}</td><td class="mono">{{ row.ip or '—' }}</td><td class="from-cell">{{ row['from'] or '—' }}</td><td class="subject-cell">{{ row.subject or '(No subject)' }}</td><td class="mono message-id">{{ row.message_id or '—' }}</td><td><span class="badge {{ row.spf|lower }}">{{ row.spf }}</span></td><td><span class="badge {{ row.dkim|lower }}">{{ row.dkim }}</span></td><td><span class="badge {{ row.dmarc|lower }}">{{ row.dmarc }}</span></td><td><a class="btn-dl" href="{{ url_for('download_source', uid=row.uid) }}" title="Download email source (.eml)">↓ Download</a></td></tr>{% endfor %}</tbody></table></div><div class="table-foot"><span id="visible-count">{{ rows|length }} rows</span><span>Header-only extraction</span></div>{% else %}<div class="empty-connect results-empty"><div class="empty-icon">≡</div><strong>No extracted results yet</strong><p>Connect an account and choose a mailbox to begin.</p></div>{% endif %}
+</section>
+{% endblock %}
